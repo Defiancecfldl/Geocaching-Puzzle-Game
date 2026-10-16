@@ -1,0 +1,35 @@
+name: 功能任务
+description: 记录可独立验收的开发或设计任务
+title: "[Feature] "
+labels: ["feature"]
+body:
+  - type: input
+    id: acceptance
+    attributes:
+      label: 验收编号
+      description: 例如 S1-B-02
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目标与用户价值
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 完成标准
+      placeholder: 使用可验证的条目描述结果。
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依赖、接口与风险
+  - type: input
+    id: owner
+    attributes:
+      label: 负责人和结对成员
+    validations:
+      required: true
