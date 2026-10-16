@@ -44,3 +44,10 @@ private-assets/
 # Third-party reference source; keep locally, do not submit to this project
 cgeo-master/
 cgeo-master.zip
+
+# Course planning documents are maintained in Feishu and kept locally only
+/cgeo源码分析与地标寻宝项目设计.md
+/地标寻宝软件从零设计流程与周计划.md
+/地标寻宝软件可行性验证与Agent协作方案.md
+/地标寻宝软件技术栈与工具链清单.md
+/第一周执行分工与接口验收规范.md
