@@ -1,0 +1,80 @@
+openapi: 3.0.3
+info:
+  title: GeoTreasure API
+  version: 0.1.0
+  description: 第一天 health 契约；先评审合并契约，再提交实现与回归测试。
+servers:
+  - url: http://localhost:3000
+    description: Local development
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: 检查 API 进程是否可用
+      description: 无需认证；不代表数据库、存储或云端部署已经可用。
+      security: []
+      responses:
+        '200':
+          description: API 进程可用
+          headers:
+            X-Request-Id:
+              description: 与响应体 requestId 相同
+              schema:
+                type: string
+                format: uuid
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResult'
+components:
+  schemas:
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [requestId, error]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [NOT_FOUND]
+            message:
+              type: string
+    HealthResult:
+      type: object
+      additionalProperties: false
+      required: [requestId, data]
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        data:
+          type: object
+          additionalProperties: false
+          required: [status, service, version, timestamp]
+          properties:
+            status:
+              type: string
+              enum: [ok]
+            service:
+              type: string
+              enum: [geotreasure-api]
+            version:
+              type: string
+              pattern: '^\d+\.\d+\.\d+$'
+              example: 0.1.0
+            timestamp:
+              type: string
+              format: date-time
+              description: ISO 8601 UTC，毫秒精度，以 Z 结尾
+              pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$'
