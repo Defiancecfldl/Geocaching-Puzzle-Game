@@ -35,5 +35,7 @@
 
 连接账号：`harrier-dubois`；仓库拥有者：`Defiancecfldl`。
 GitHub仓库元数据返回：push=true、pull=true、triage=true、admin=false、maintain=false。
-因此当前连接显示可写协作权限，未显示管理员/维护者权限；提交邮箱和user.name不决定GitHub仓库权限。
-专门的协作者角色查询及GitHub连接写入均被集成权限以403拒绝，不能将此拒绝解释为用户没有仓库写权限；实际推送仍需可用的GitHub写入认证。
+通过本机已登录账号再次调用协作者权限接口，确认 `permission=write`、`role_name=write`。
+结论：用户是可写协作者，具有推送/PR协作权限，不是仓库管理员；提交邮箱和user.name不决定仓库权限。
+插件的角色查询和写入被集成权限以403拒绝，属于插件访问限制。本次通过用户本机Git登录已成功推送两个工作分支，并核验真实角色。
+仅在本仓库为GitHub配置电脑现有代理，不修改全局Git配置。GitHub登录凭据由系统凭据管理器保管，未写入仓库、文档或日志。
