@@ -1,0 +1,29 @@
+# 第1天环境与接口回归
+
+日期：2026-10-21；记录人：E。
+被验证的工具链交付：`ba8dbd407aa09600944c72bfc8ed81c7124577b6`；工作分支：`chore/quality-baseline`。
+原始检查在提交前对同一文件内容完成，提交后代码未改动；本记录不代表全员或云端验收通过。
+
+| 检查 | 结果 | 证据摘要 |
+| --- | --- | --- |
+| Node / CLI | PASS | Node24.20.0、CloudBase CLI3.8.7、Bruno CLI4.2.1 |
+| npm ci | PASS | 根目录锁文件可复现安装 |
+| typecheck | PASS | TypeScript 检查通过 |
+| api:contract | PASS | OpenAPI 3.0.3，health 契约0.1.0 |
+| api:smoke | PASS | 临时本地服务，1请求、4/4测试通过 |
+| api:test | PASS | 默认 localhost:3000，1请求、4/4测试通过 |
+| 版本约束 | PASS | Node24.14.0 被 EBADENGINE 拒绝 |
+| Android单测 | PASS | GeoMathTest 3项、0失败、0错误 |
+| Android打包 | PASS | assembleDebug 成功 |
+| Android Lint | PASS | lintDebug 成功，XML无issue |
+| 手机/云端/第二台电脑 | NOT_RUN | 待对应设备、环境及团队提供证据 |
+| GitHub CI/非作者审核 | NOT_RUN | 尚无本次工作流运行或审核证据 |
+
+Android 完整检查使用 `android-app/scripts/verify-windows.ps1`，最终 BUILD SUCCESSFUL，2分42秒。
+本机原始日志保存在仓库外的 `.devtools/verification/20261021-113941-android.txt`，不作为团队可访问的远程证据。
+APK位于 `android-app/app/build/outputs/apk/debug/app-debug.apk`，不提交二进制到Git。
+SHA-256：`CCC4497B7AD84AEC7117598468194C15EC8D6D5EEB6066E7F3C324C9CE0C0BDF`。
+地图Key为空，此构建使用演示模式；真实地图未验收。
+
+复现命令见 [统一工具链](../toolchain.md) 与 [API契约](../api/README.md)。
+后续业务测试必须在接口契约定稿、实现交付后加入默认回归。
