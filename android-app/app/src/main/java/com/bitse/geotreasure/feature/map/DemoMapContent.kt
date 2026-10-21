@@ -3,6 +3,7 @@ package com.bitse.geotreasure.feature.map
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -22,6 +23,8 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import com.bitse.geotreasure.core.model.CampusZone
+import com.bitse.geotreasure.core.model.Landmark
 import com.bitse.geotreasure.core.model.MapRenderState
 
 @Composable
@@ -30,8 +33,6 @@ fun DemoMapContent(
     onLandmarkSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val primary = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.secondary
     val tertiary = MaterialTheme.colorScheme.tertiary
     Box(
         modifier = modifier
@@ -85,29 +86,20 @@ fun DemoMapContent(
             )
         }
 
-        state.landmarks.getOrNull(0)?.let { landmark ->
-            MapMarkerButton(
-                selected = landmark.id == state.selectedLandmarkId,
-                color = primary,
-                onClick = { onLandmarkSelected(landmark.id) },
-                modifier = Modifier.align(Alignment.TopCenter).offset(x = 58.dp, y = 146.dp),
-            )
-        }
-        state.landmarks.getOrNull(1)?.let { landmark ->
-            MapMarkerButton(
-                selected = landmark.id == state.selectedLandmarkId,
-                color = secondary,
-                onClick = { onLandmarkSelected(landmark.id) },
-                modifier = Modifier.align(Alignment.CenterStart).offset(x = 46.dp, y = 72.dp),
-            )
-        }
-        state.landmarks.getOrNull(2)?.let { landmark ->
-            MapMarkerButton(
-                selected = landmark.id == state.selectedLandmarkId,
-                color = primary,
-                onClick = { onLandmarkSelected(landmark.id) },
-                modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-52).dp, y = (-174).dp),
-            )
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            state.landmarks.forEachIndexed { index, landmark ->
+                val position = demoMarkerPositions[index % demoMarkerPositions.size]
+                MapMarkerButton(
+                    landmark = landmark,
+                    selected = landmark.id == state.selectedLandmarkId,
+                    color = landmark.campusZone.markerColor(),
+                    onClick = { onLandmarkSelected(landmark.id) },
+                    modifier = Modifier.offset(
+                        x = maxWidth * position.xFraction,
+                        y = maxHeight * position.yFraction,
+                    ),
+                )
+            }
         }
         if (state.userLocation != null) {
             Icon(
@@ -122,6 +114,7 @@ fun DemoMapContent(
 
 @Composable
 private fun MapMarkerButton(
+    landmark: Landmark,
     selected: Boolean,
     color: Color,
     onClick: () -> Unit,
@@ -135,6 +128,33 @@ private fun MapMarkerButton(
             contentColor = Color.White,
         ),
     ) {
-        Icon(Icons.Rounded.LocationOn, contentDescription = "选择地标")
+        Icon(Icons.Rounded.LocationOn, contentDescription = "选择${landmark.name}")
     }
+}
+
+private data class DemoMarkerPosition(
+    val xFraction: Float,
+    val yFraction: Float,
+)
+
+private val demoMarkerPositions = listOf(
+    DemoMarkerPosition(0.12f, 0.14f),
+    DemoMarkerPosition(0.31f, 0.18f),
+    DemoMarkerPosition(0.14f, 0.30f),
+    DemoMarkerPosition(0.34f, 0.34f),
+    DemoMarkerPosition(0.61f, 0.14f),
+    DemoMarkerPosition(0.80f, 0.20f),
+    DemoMarkerPosition(0.63f, 0.31f),
+    DemoMarkerPosition(0.82f, 0.37f),
+    DemoMarkerPosition(0.13f, 0.48f),
+    DemoMarkerPosition(0.33f, 0.54f),
+    DemoMarkerPosition(0.58f, 0.49f),
+    DemoMarkerPosition(0.77f, 0.55f),
+)
+
+@Composable
+private fun CampusZone.markerColor(): Color = when (this) {
+    CampusZone.NORTH -> MaterialTheme.colorScheme.primary
+    CampusZone.EAST -> MaterialTheme.colorScheme.tertiary
+    CampusZone.SOUTH -> MaterialTheme.colorScheme.secondary
 }

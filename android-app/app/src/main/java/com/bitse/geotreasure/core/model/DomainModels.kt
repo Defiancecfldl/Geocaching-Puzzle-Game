@@ -28,11 +28,51 @@ data class Landmark(
     val id: String,
     val name: String,
     val point: GeoPoint,
+    val campusZone: CampusZone,
+    val fragmentId: String,
+    val pieceIndex: Int,
+    val coordinateVerified: Boolean,
     val checkInRadiusMeters: Double,
     val difficulty: Int,
     val terrain: Int,
     val hint: String?,
 )
+
+enum class CampusZone {
+    NORTH,
+    EAST,
+    SOUTH,
+}
+
+enum class PuzzleRevealMode {
+    GRID,
+    FOG_OF_WAR,
+}
+
+data class PuzzleFragmentDefinition(
+    val id: String,
+    val landmarkId: String,
+    val title: String,
+    val pieceIndex: Int,
+)
+
+data class PuzzleSectionDefinition(
+    val id: String,
+    val campusZone: CampusZone,
+    val rows: Int,
+    val columns: Int,
+    val fragments: List<PuzzleFragmentDefinition>,
+)
+
+data class PuzzleDefinition(
+    val id: String,
+    val title: String,
+    val defaultRevealMode: PuzzleRevealMode,
+    val sections: List<PuzzleSectionDefinition>,
+) {
+    val fragmentCount: Int
+        get() = sections.sumOf { it.fragments.size }
+}
 
 data class CheckInDraft(
     val id: String,

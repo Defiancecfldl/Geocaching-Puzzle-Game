@@ -240,6 +240,7 @@ fun MapScreen(
                     radiusMeters = landmark.checkInRadiusMeters,
                     distanceMeters = uiState.distanceToSelectedMeters,
                     userLocation = uiState.userLocation,
+                    coordinateVerified = landmark.coordinateVerified,
                     onOpen = { viewModel.onAction(MapAction.OpenLandmark(landmark.id)) },
                 )
             }
@@ -349,6 +350,7 @@ private fun LandmarkPanel(
     radiusMeters: Double,
     distanceMeters: Double?,
     userLocation: LocationSample?,
+    coordinateVerified: Boolean,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -377,6 +379,13 @@ private fun LandmarkPanel(
                             } else {
                                 MaterialTheme.colorScheme.error
                             },
+                        )
+                    }
+                    if (!coordinateVerified) {
+                        Text(
+                            text = "演示坐标 · 待实地核验",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
                         )
                     }
                 }
