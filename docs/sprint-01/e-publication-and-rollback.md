@@ -34,7 +34,7 @@
 
 需要找回旧本地交付时，将bundle克隆到新的空目录，或从backup分支创建恢复分支；不覆盖当前工作区。
 
-## 权限核查
+## 首次发布时的权限核查
 
 连接账号：`harrier-dubois`；仓库拥有者：`Defiancecfldl`。
 GitHub仓库元数据返回：push=true、pull=true、triage=true、admin=false、maintain=false。
@@ -42,3 +42,10 @@ GitHub仓库元数据返回：push=true、pull=true、triage=true、admin=false�
 结论：用户是可写协作者，具有推送/PR协作权限，不是仓库管理员；提交邮箱和user.name不决定仓库权限。
 插件的角色查询和写入被集成权限以403拒绝，属于插件访问限制。本次通过用户本机Git登录已成功推送两个工作分支，并核验真实角色。
 仅在本仓库为GitHub配置电脑现有代理，不修改全局Git配置。GitHub登录凭据由系统凭据管理器保管，未写入仓库、文档或日志。
+
+## 仓库转移后的合并前复核（2026-10-21）
+
+仓库现位于 [Geo-Puz-Game-for-BIT/Geocaching-Puzzle-Game](https://github.com/Geo-Puz-Game-for-BIT/Geocaching-Puzzle-Game)，原链接由 GitHub 重定向。
+通过本机已登录账号查询协作者权限，`harrier-dubois` 当前 `permission=admin`、`role_name=admin`；上节保留首次发布时的历史权限，不代表当前权限。
+两个 PR 当前均无冲突；PR #2 为 open，PR #3 为依赖契约的 draft。此次复核仍未取得非作者正式 Review，也没有两个提交对应的 GitHub 检查运行。
+管理员操作权限不替代 CONTRIBUTING.md 要求的责任区外成员审核。先取得契约审核并合并 #2，再将 #3 的目标改为 develop、转为 ready，取得实现与测试的审核后合并；保留 merge commit 便于按前述方法撤销。
