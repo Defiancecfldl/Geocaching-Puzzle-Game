@@ -27,3 +27,5 @@ E 同时维护仓库、审核 PR。不得将作者本人执行的检查视为非
 4. 在 `docs/testing/` 记录缺陷和复测，在 `docs/sprint-01/` 更新集成与发布结论。
 
 此前本地工具链提交创建于临时分支 `chore/day1-toolchain`；现统一改名，保留原有提交，不重写历史。
+
+提交GitHub前按远端CONTRIBUTING重新拆成契约PR与依赖它的质量PR；旧本地历史已另存备份分支和bundle，未强推远端。恢复与撤销方式见 [交付及撤销记录](e-publication-and-rollback.md)。

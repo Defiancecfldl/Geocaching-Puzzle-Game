@@ -37,7 +37,7 @@ Android Studio 自带运行时与项目构建 JDK 可以不同；项目仍用 JD
 ## E 每晚验收
 
 - 记录 PR/提交 SHA、责任 A～D、实际软件版本、执行命令和结果；截图不能替代可运行交付。
-- 接口有修改：同 PR 对照 OpenAPI、Bruno、实现，检查字段、空值、单位、认证与错误分支。
+- 接口有修改：先评审合并OpenAPI，再验收实现/测试PR；对照三者检查字段、空值、单位、认证与错误分支。
 - 执行 npm ci、typecheck、api:contract；本地执行 api:smoke，D 提供开发地址后增加 api:test:development。
 - Android 变更执行单测、assembleDebug、lintDebug，UI 变更补两台手机截图/录屏。
 - 查看 PR 差异和 git status，检查真实环境 ID、Token、密钥、定位和照片是否误入提交。

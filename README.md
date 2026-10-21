@@ -25,7 +25,7 @@ npm run api:smoke
 ```
 
 人工联调先 `npm run dev`，另一个终端 `npm run api:test`。
-OpenAPI 是契约，Bruno 是可运行测试，后端是实现；接口变更在同一个 PR 更新三者。
+OpenAPI 是契约，Bruno 是可运行测试，后端是实现。按协作规范先评审合并契约，再提交实现与测试PR，并引用已经合并的契约。
 
 ## 提交位置
 
