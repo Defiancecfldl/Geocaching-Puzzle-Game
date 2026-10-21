@@ -1,80 +1,738 @@
 openapi: 3.0.3
 info:
-  title: GeoTreasure API
-  version: 0.1.0
-  description: 第一天 health 契约；先评审合并契约，再提交实现与回归测试。
+  title: GeoTreasure CloudBase HTTP API
+  version: 1.0.0-poc
+  license:
+    name: Course Project
+    url: https://github.com/Geo-Puz-Game-for-BIT/Geocaching-Puzzle-Game
+  description: |
+    First-week vertical-slice API for the GeoTreasure Android client.
+
+    Conventions:
+    - Coordinates use GCJ02.
+    - Timestamps use UTC ISO 8601.
+    - Distance fields end with `Meters`.
+    - JSON fields use camelCase.
+    - Errors always use the unified response envelope.
+  x-contract-version: 1.0.0-poc
 servers:
+  - url: https://cloud-d0g0u4r64556b8177-1510671296.ap-shanghai.app.tcloudbase.com/api/v1
+    description: First-week development environment
   - url: http://localhost:3000
-    description: Local development
+    description: Local development adapter
+tags:
+  - name: health
+    description: Service health and environment checks
+  - name: landmarks
+    description: Landmark discovery and task data
+  - name: checkins
+    description: Challenge, photo upload and idempotent check-in flow
+  - name: puzzles
+    description: Fragment ownership and puzzle progress
+security:
+  - bearerAuth: []
 paths:
   /health:
     get:
       operationId: getHealth
-      summary: 检查 API 进程是否可用
-      description: 无需认证；不代表数据库、存储或云端部署已经可用。
+      tags: [health]
+      summary: Check service health
       security: []
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
       responses:
-        '200':
-          description: API 进程可用
+        "200":
+          description: Service is available
           headers:
             X-Request-Id:
-              description: 与响应体 requestId 相同
-              schema:
-                type: string
-                format: uuid
-            Cache-Control:
-              schema:
-                type: string
-                enum: [no-store]
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthResult'
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                requestId: 123e4567-e89b-42d3-a456-426614174000
+                data:
+                  status: ok
+                  service: geotreasure-api
+                  version: 0.1.0
+                  environment: dev
+                  timestamp: "2026-10-20T08:17:21.000Z"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /landmarks:
+    get:
+      operationId: listLandmarks
+      tags: [landmarks]
+      summary: List active landmarks
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+        - name: latitude
+          in: query
+          schema:
+            type: number
+            format: double
+            minimum: -90
+            maximum: 90
+        - name: longitude
+          in: query
+          schema:
+            type: number
+            format: double
+            minimum: -180
+            maximum: 180
+        - name: radiusMeters
+          in: query
+          schema:
+            type: number
+            format: double
+            minimum: 0
+      responses:
+        "200":
+          description: Active landmarks
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, data]
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Landmark"
+              example:
+                requestId: 123e4567-e89b-42d3-a456-426614174000
+                data:
+                  - id: lmk_library
+                    name: BIT Library
+                    point:
+                      latitude: 39.9592
+                      longitude: 116.3083
+                    coordinateSystem: GCJ02
+                    checkInRadiusMeters: 100
+                    difficulty: 2
+                    terrain: 1
+                    hint: Look near the main entrance.
+                    task:
+                      id: tsk_library_photo
+                      type: photo
+                      instructions: Take a photo of the library entrance and submit it from the marker.
+                      puzzleId: pzl_campus_01
+                      fragmentId: frg_campus_01_01
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+  /checkin-challenges:
+    post:
+      operationId: createCheckInChallenge
+      tags: [checkins]
+      summary: Create a short-lived, single-use challenge
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [landmarkId]
+              properties:
+                landmarkId:
+                  type: string
+                  example: lmk_library
+      responses:
+        "200":
+          description: Challenge created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, data]
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/CheckInChallenge"
+              example:
+                requestId: 123e4567-e89b-42d3-a456-426614174000
+                data:
+                  id: chl_01JTEST
+                  landmarkId: lmk_library
+                  expiresAt: "2026-10-20T08:22:00.000Z"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "404":
+          $ref: "#/components/responses/LandmarkNotFound"
+  /checkin-photos:
+    post:
+      operationId: uploadCheckInPhoto
+      tags: [checkins]
+      summary: Upload a JPEG check-in photo
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Photo uploaded
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, data]
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/UploadedPhoto"
+              example:
+                requestId: 123e4567-e89b-42d3-a456-426614174000
+                data:
+                  photoId: pho_01JTEST
+                  objectKey: checkins/usr_demo01/pho_01JTEST.jpg
+                  uploadedAt: "2026-10-20T08:17:21.000Z"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "422":
+          description: Photo is missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              examples:
+                missing:
+                  value:
+                    requestId: 123e4567-e89b-42d3-a456-426614174000
+                    error:
+                      code: PHOTO_REQUIRED
+                      message: A photo file is required
+                      retryable: false
+                invalid:
+                  value:
+                    requestId: 123e4567-e89b-42d3-a456-426614174000
+                    error:
+                      code: PHOTO_INVALID
+                      message: Only image/jpeg is accepted
+                      retryable: false
+  /checkins:
+    post:
+      operationId: submitCheckIn
+      tags: [checkins]
+      summary: Submit a check-in and grant the configured fragment once
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            maxLength: 128
+          example: 7a1c6e05-...-uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitCheckInRequest"
+            example:
+              landmarkId: lmk_library
+              challengeId: chl_01JTEST
+              photoId: pho_01JTEST
+              location:
+                point:
+                  latitude: 39.9592
+                  longitude: 116.3083
+                accuracyMeters: 10
+                capturedAt: "2026-10-20T08:17:21.000Z"
+      responses:
+        "200":
+          description: Completed or already completed
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, data]
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/CheckInReceipt"
+              examples:
+                completed:
+                  value:
+                    requestId: 123e4567-e89b-42d3-a456-426614174000
+                    data:
+                      checkInId: chk_01JTEST
+                      status: COMPLETED
+                      fragmentGrant:
+                        fragmentId: frg_campus_01_01
+                        puzzleId: pzl_campus_01
+                        pieceIndex: 0
+                        grantedAt: "2026-10-20T08:17:21.000Z"
+                alreadyCompleted:
+                  value:
+                    requestId: 123e4567-e89b-42d3-a456-426614174000
+                    data:
+                      checkInId: chk_01JTEST
+                      status: ALREADY_COMPLETED
+                      fragmentGrant:
+                        fragmentId: frg_campus_01_01
+                        puzzleId: pzl_campus_01
+                        pieceIndex: 0
+                        grantedAt: "2026-10-20T08:17:21.000Z"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "409":
+          description: Challenge expired or idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              examples:
+                challengeExpired:
+                  value:
+                    requestId: 123e4567-e89b-42d3-a456-426614174000
+                    error:
+                      code: CHALLENGE_EXPIRED
+                      message: Challenge is expired or already used
+                      retryable: true
+                idempotencyConflict:
+                  value:
+                    requestId: 123e4567-e89b-42d3-a456-426614174000
+                    error:
+                      code: IDEMPOTENCY_CONFLICT
+                      message: The Idempotency-Key was already used with a different request
+                      retryable: false
+        "422":
+          description: Location, accuracy or photo validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              examples:
+                accuracy:
+                  value:
+                    requestId: 123e4567-e89b-42d3-a456-426614174000
+                    error:
+                      code: LOCATION_ACCURACY_TOO_LOW
+                      message: Location accuracy must be 50m or better
+                      retryable: false
+                      details:
+                        accuracyMeters: 80
+                outOfRange:
+                  value:
+                    requestId: 123e4567-e89b-42d3-a456-426614174000
+                    error:
+                      code: OUT_OF_RANGE
+                      message: Current location is outside the check-in radius
+                      retryable: false
+                      details:
+                        distanceMeters: 240
+                        radiusMeters: 100
+                photoRequired:
+                  value:
+                    requestId: 123e4567-e89b-42d3-a456-426614174000
+                    error:
+                      code: PHOTO_REQUIRED
+                      message: A valid uploaded photo is required
+                      retryable: false
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /puzzles/{puzzleId}:
+    get:
+      operationId: getPuzzleProgress
+      tags: [puzzles]
+      summary: Get owned fragments and puzzle progress
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+        - name: puzzleId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: pzl_campus_01
+      responses:
+        "200":
+          description: Puzzle progress
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, data]
+                properties:
+                  requestId:
+                    type: string
+                  data:
+                    $ref: "#/components/schemas/PuzzleProgress"
+              example:
+                requestId: 123e4567-e89b-42d3-a456-426614174000
+                data:
+                  puzzleId: pzl_campus_01
+                  name: Campus Puzzle 01
+                  rows: 3
+                  columns: 3
+                  ownedFragmentIds: [frg_campus_01_01]
+                  fragments:
+                    - fragmentId: frg_campus_01_01
+                      pieceIndex: 0
+                      imageKey: puzzles/pzl_campus_01/frg_campus_01_01.png
+                  completed: false
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "404":
+          description: Puzzle not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+              example:
+                requestId: 123e4567-e89b-42d3-a456-426614174000
+                error:
+                  code: PUZZLE_NOT_FOUND
+                  message: Puzzle does not exist
+                  retryable: false
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  headers:
+    RequestId:
+      description: Request correlation ID
+      schema:
+        type: string
+        format: uuid
+  parameters:
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+      example: 123e4567-e89b-42d3-a456-426614174000
+  responses:
+    InvalidRequest:
+      description: Request body or parameters are invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            requestId: 123e4567-e89b-42d3-a456-426614174000
+            error:
+              code: INVALID_REQUEST
+              message: Request body must be valid JSON
+              retryable: false
+    AuthRequired:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            requestId: 123e4567-e89b-42d3-a456-426614174000
+            error:
+              code: AUTH_REQUIRED
+              message: A valid bearer token is required
+              retryable: false
+    LandmarkNotFound:
+      description: Landmark does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            requestId: 123e4567-e89b-42d3-a456-426614174000
+            error:
+              code: LANDMARK_NOT_FOUND
+              message: Landmark does not exist
+              retryable: false
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            requestId: 123e4567-e89b-42d3-a456-426614174000
+            error:
+              code: INTERNAL_ERROR
+              message: Unexpected server error
+              retryable: true
   schemas:
     ApiError:
       type: object
-      additionalProperties: false
       required: [requestId, error]
       properties:
         requestId:
           type: string
-          format: uuid
+          example: 123e4567-e89b-42d3-a456-426614174000
         error:
           type: object
-          additionalProperties: false
-          required: [code, message]
+          required: [code, message, retryable]
           properties:
             code:
               type: string
-              enum: [NOT_FOUND]
+              enum:
+                - AUTH_REQUIRED
+                - INVALID_REQUEST
+                - LANDMARK_NOT_FOUND
+                - PUZZLE_NOT_FOUND
+                - LOCATION_REQUIRED
+                - LOCATION_ACCURACY_TOO_LOW
+                - OUT_OF_RANGE
+                - CHALLENGE_EXPIRED
+                - PHOTO_REQUIRED
+                - PHOTO_INVALID
+                - CHECKIN_ALREADY_COMPLETED
+                - IDEMPOTENCY_CONFLICT
+                - INTERNAL_ERROR
             message:
               type: string
-    HealthResult:
+            retryable:
+              type: boolean
+            details:
+              type: object
+              additionalProperties: true
+    HealthResponse:
       type: object
-      additionalProperties: false
       required: [requestId, data]
       properties:
         requestId:
           type: string
-          format: uuid
         data:
           type: object
-          additionalProperties: false
-          required: [status, service, version, timestamp]
+          required: [status, service, version, environment, timestamp]
           properties:
             status:
               type: string
               enum: [ok]
             service:
               type: string
-              enum: [geotreasure-api]
             version:
               type: string
-              pattern: '^\d+\.\d+\.\d+$'
-              example: 0.1.0
+            environment:
+              type: string
             timestamp:
               type: string
               format: date-time
-              description: ISO 8601 UTC，毫秒精度，以 Z 结尾
-              pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$'
+    GeoPoint:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+    Task:
+      type: object
+      required: [id, type, instructions, puzzleId, fragmentId]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [photo]
+        instructions:
+          type: string
+        puzzleId:
+          type: string
+        fragmentId:
+          type: string
+    Landmark:
+      type: object
+      required:
+        [
+          id,
+          name,
+          point,
+          coordinateSystem,
+          checkInRadiusMeters,
+          difficulty,
+          terrain,
+          hint,
+          task,
+        ]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        point:
+          $ref: "#/components/schemas/GeoPoint"
+        coordinateSystem:
+          type: string
+          enum: [GCJ02]
+        checkInRadiusMeters:
+          type: number
+          description: Check-in radius in meters
+        difficulty:
+          type: integer
+          minimum: 1
+          maximum: 5
+        terrain:
+          type: integer
+          minimum: 1
+          maximum: 5
+        hint:
+          type: string
+          nullable: true
+        task:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/Task"
+          nullable: true
+    CheckInChallenge:
+      type: object
+      required: [id, landmarkId, expiresAt]
+      properties:
+        id:
+          type: string
+        landmarkId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+          description: UTC ISO 8601
+    UploadedPhoto:
+      type: object
+      required: [photoId, objectKey, uploadedAt]
+      properties:
+        photoId:
+          type: string
+        objectKey:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+    LocationSample:
+      type: object
+      required: [point, accuracyMeters, capturedAt]
+      properties:
+        point:
+          $ref: "#/components/schemas/GeoPoint"
+        accuracyMeters:
+          type: number
+          minimum: 0
+          description: Location accuracy in meters
+        capturedAt:
+          type: string
+          format: date-time
+    SubmitCheckInRequest:
+      type: object
+      required: [landmarkId, challengeId, photoId, location]
+      properties:
+        landmarkId:
+          type: string
+        challengeId:
+          type: string
+        photoId:
+          type: string
+        location:
+          $ref: "#/components/schemas/LocationSample"
+    FragmentGrant:
+      type: object
+      required: [fragmentId, puzzleId, pieceIndex, grantedAt]
+      properties:
+        fragmentId:
+          type: string
+        puzzleId:
+          type: string
+        pieceIndex:
+          type: integer
+          minimum: 0
+          maximum: 8
+        grantedAt:
+          type: string
+          format: date-time
+    CheckInReceipt:
+      type: object
+      required: [checkInId, status, fragmentGrant]
+      properties:
+        checkInId:
+          type: string
+        status:
+          type: string
+          enum: [COMPLETED, ALREADY_COMPLETED]
+        fragmentGrant:
+          $ref: "#/components/schemas/FragmentGrant"
+    PuzzleProgress:
+      type: object
+      required:
+        [puzzleId, name, rows, columns, ownedFragmentIds, fragments, completed]
+      properties:
+        puzzleId:
+          type: string
+        name:
+          type: string
+        rows:
+          type: integer
+        columns:
+          type: integer
+        ownedFragmentIds:
+          type: array
+          items:
+            type: string
+        fragments:
+          type: array
+          items:
+            type: object
+            required: [fragmentId, pieceIndex, imageKey]
+            properties:
+              fragmentId:
+                type: string
+              pieceIndex:
+                type: integer
+                minimum: 0
+                maximum: 8
+              imageKey:
+                type: string
+        completed:
+          type: boolean
