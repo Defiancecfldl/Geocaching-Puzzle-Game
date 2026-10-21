@@ -10,6 +10,9 @@
 2. `chore/quality-baseline` → `docs/api-health-contract`：依赖前一PR的工具链、health实现、Bruno回归与E验收文档。契约合并到develop后，将此PR目标改为develop，再经非作者审核后合并。
 
 两PR共同交付接口标准和实际测试，但不得跳过契约的先行审核、合并。
+
+已创建并核对：[契约PR #2](https://github.com/Defiancecfldl/Geocaching-Puzzle-Game/pull/2) 为待审核状态；[质量PR #3](https://github.com/Defiancecfldl/Geocaching-Puzzle-Game/pull/3) 为依赖契约的草稿。
+两分支均已推送，PR作者为harrier-dubois；main/develop未直接修改，尚未合并或获得非作者审核。
 测试结果、请求/响应示例见 `docs/testing/day1-environment-api-regression.md` 与 `docs/api/README.md`。
 无UI变更；真实云端、手机、第二机、GitHub CI均尚未验收。
 
