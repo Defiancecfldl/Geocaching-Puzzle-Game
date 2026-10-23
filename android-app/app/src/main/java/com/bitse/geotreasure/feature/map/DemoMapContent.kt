@@ -18,14 +18,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.unit.dp
 import com.bitse.geotreasure.core.model.CampusZone
+import com.bitse.geotreasure.core.model.CheckInArea
+import com.bitse.geotreasure.core.model.CircularCheckInArea
 import com.bitse.geotreasure.core.model.Landmark
 import com.bitse.geotreasure.core.model.MapRenderState
+import com.bitse.geotreasure.core.model.PolygonCheckInArea
 
 @Composable
 fun DemoMapContent(
@@ -89,16 +96,55 @@ fun DemoMapContent(
         BoxWithConstraints(Modifier.fillMaxSize()) {
             state.landmarks.forEachIndexed { index, landmark ->
                 val position = demoMarkerPositions[index % demoMarkerPositions.size]
-                MapMarkerButton(
+                DemoLandmarkMarker(
                     landmark = landmark,
                     selected = landmark.id == state.selectedLandmarkId,
                     color = landmark.campusZone.markerColor(),
                     onClick = { onLandmarkSelected(landmark.id) },
                     modifier = Modifier.offset(
-                        x = maxWidth * position.xFraction,
-                        y = maxHeight * position.yFraction,
+                        x = maxWidth * position.xFraction - 24.dp,
+                        y = maxHeight * position.yFraction - 24.dp,
                     ),
                 )
+            }
+        }
+        Canvas(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen },
+        ) {
+            if (!state.debugRevealAll) {
+                drawRect(color = Color(0x66343A40))
+                if (state.userLocation != null) {
+                    drawCircle(
+                        color = Color.Transparent,
+                        radius = size.minDimension * 0.19f,
+                        center = center,
+                        blendMode = BlendMode.Clear,
+                    )
+                    if (state.debugShowScoutRange) {
+                        drawCircle(
+                            color = Color(0xCC66D7B0),
+                            radius = size.minDimension * 0.19f,
+                            center = center,
+                            style = Stroke(width = 3.dp.toPx()),
+                        )
+                    }
+                }
+                state.landmarks.forEachIndexed { index, landmark ->
+                    if (landmark.id in state.completedLandmarkIds) {
+                        val position = demoMarkerPositions[index % demoMarkerPositions.size]
+                        drawCircle(
+                            color = Color.Transparent,
+                            radius = size.minDimension * 0.16f,
+                            center = Offset(
+                                x = size.width * position.xFraction,
+                                y = size.height * position.yFraction,
+                            ),
+                            blendMode = BlendMode.Clear,
+                        )
+                    }
+                }
             }
         }
         if (state.userLocation != null) {
@@ -108,6 +154,73 @@ fun DemoMapContent(
                 tint = tertiary,
                 modifier = Modifier.align(Alignment.Center).size(30.dp),
             )
+        }
+    }
+}
+
+@Composable
+private fun DemoLandmarkMarker(
+    landmark: Landmark,
+    selected: Boolean,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.size(96.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            DemoCheckInArea(
+                area = landmark.checkInArea,
+                color = color,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        MapMarkerButton(
+            landmark = landmark,
+            selected = selected,
+            color = color,
+            onClick = onClick,
+        )
+    }
+}
+
+@Composable
+private fun DemoCheckInArea(
+    area: CheckInArea,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier) {
+        when (area) {
+            is CircularCheckInArea -> {
+                drawCircle(color = color.copy(alpha = 0.14f), radius = size.minDimension * 0.45f)
+                drawCircle(
+                    color = color.copy(alpha = 0.75f),
+                    radius = size.minDimension * 0.45f,
+                    style = Stroke(width = 2.dp.toPx()),
+                )
+            }
+
+            is PolygonCheckInArea -> {
+                val minEast = area.vertices.minOf { it.eastMeters }
+                val maxEast = area.vertices.maxOf { it.eastMeters }
+                val minNorth = area.vertices.minOf { it.northMeters }
+                val maxNorth = area.vertices.maxOf { it.northMeters }
+                val eastSpan = (maxEast - minEast).coerceAtLeast(1.0)
+                val northSpan = (maxNorth - minNorth).coerceAtLeast(1.0)
+                val padding = size.minDimension * 0.08f
+                val path = Path()
+                area.vertices.forEachIndexed { index, vertex ->
+                    val x = padding + ((vertex.eastMeters - minEast) / eastSpan).toFloat() * (size.width - padding * 2)
+                    val y = padding + ((maxNorth - vertex.northMeters) / northSpan).toFloat() * (size.height - padding * 2)
+                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                path.close()
+                drawPath(path, color = color.copy(alpha = 0.14f))
+                drawPath(path, color = color.copy(alpha = 0.75f), style = Stroke(width = 2.dp.toPx()))
+            }
         }
     }
 }

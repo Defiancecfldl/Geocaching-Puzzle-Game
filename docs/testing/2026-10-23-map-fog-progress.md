@@ -1,0 +1,50 @@
+# 2026-10-23 地图战争迷雾工作记录
+
+## 本次已完成
+
+- 明确战争迷雾位于地图页，不放在地标详情页。
+- 普通玩家不显示人物周围的侦查圈；侦查圈只作为计算可见区域的内部范围。
+- 未探索区域使用灰色半透明遮罩。
+- 人物移动后，可靠定位点周围的区域逐步驱散迷雾。
+- 完成地标任务后，增加该地标所在区域的大范围可见孔洞，当前演示半径为 220 米。
+- Debug 包增加地图调试入口：显示全图、显示侦查圈、调整当前地标范围、切换圆形/矩形、直接标记当前地标完成。
+- 拍照演示确认后会携带地标 ID 进入打卡结果页，并写入本地演示进度，使地图可以驱散对应区域。
+- 引导箭头暂未接入真实功能；架构和后续分工已记录在 `docs/adr/0003-map-fog-of-war-and-guidance.md`。
+
+## 已修改的主要位置
+
+- `core/model/DomainModels.kt`：增加 `completedLandmarkIds`、Debug 地图状态字段和探索状态。
+- `app/ExplorationProgressStore.kt`：保存当前进程内已完成地标。
+- `feature/map/MapViewModel.kt`：记录探索中心、调试范围覆盖和完成状态。
+- `core/map/AmapMapAdapter.kt`：使用高德 `Polygon` 与 `CircleHoleOptions` 绘制迷雾孔洞；普通模式不显示侦查圈，Debug 模式才显示。
+- `feature/map/DemoMapContent.kt`：离线演示地图同步灰色遮罩、探索孔洞和完成区域驱散效果。
+- `feature/map/MapScreen.kt`：增加 Debug 地图面板。
+- `feature/camera/CameraScreen.kt`、`feature/checkin/CheckInResultScreen.kt`、`navigation/`：完成演示流程携带地标 ID。
+
+## 验证状态
+
+- 在这次新增完成状态和 Debug 功能之前，完整 Android 验证曾通过：单元测试、`assembleDebug`、Lint 均通过。
+- 新增代码第一次 Kotlin 编译发现高德 Java 泛型问题：`setHoleOptions` 要求 `List<BaseHoleOptions>`，原代码推断成 `List<CircleHoleOptions>`。
+- 已修正为显式的 `state.exploredCenters.map<GeoPoint, BaseHoleOptions>`。
+- 修正后的 Kotlin 编译、单元测试、Debug 构建和 Lint 已于 2026-10-23 18:07 完成并通过。
+- 后续补充定位看门超时：首次 12 秒没有定位时提示，已有位置后信号中断时保留上次位置并提示；看门任务在停止定位时清理。
+- 补充修复后的 `testDebugUnitTest`、`assembleDebug`、`lintDebug` 于 2026-10-23 再次通过。
+- 本次验证使用临时 `W:` 映射绕开中文路径，验证结束后映射已删除。
+- APK 已生成：`android-app/app/build/outputs/apk/debug/app-debug.apk`（约 73.8 MB）。
+- `adb devices -l` 已成功启动 ADB 守护进程，但当前没有列出设备，因此本轮尚未完成真机安装和视觉验收。
+
+## 下次续接顺序
+
+1. 重新连接并授权 USB 调试设备，确认 `adb devices -l` 出现序列号。
+2. 使用绝对路径安装：`adb -s <serial> install -r "D:\卷资料\Software Engineering_Geocaching\android-app\app\build\outputs\apk\debug\app-debug.apk"`。
+3. 真机解锁后检查：普通模式无侦查圈、移动后区域变亮、Debug 面板显示侦查圈、完成地标后大范围驱散。
+4. 真机验收通过后再提交功能分支，不要把当前版本直接合入 `main`。
+
+## 暂缓并同步其他成员
+
+- C：真实 CameraX、照片草稿、真实完成事件；完成事件最终替换当前 `ExplorationProgressStore` 的演示写入。
+- D：服务端保存探索进度、完成地标、引导次数和谜语答案；当前探索记录只在进程内有效。
+- E：迷雾透明度、侦查圈 Debug 样式、引导箭头视觉规范。
+- B 后续：手机朝向、最近未完成地标计算、引导箭头显示和定位失败/精度不足时的正式验收。
+
+战争迷雾跨组实现说明见 `docs/design/战争迷雾设计与实现协作指南.md`。

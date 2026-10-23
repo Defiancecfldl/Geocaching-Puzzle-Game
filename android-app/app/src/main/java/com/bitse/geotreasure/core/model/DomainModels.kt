@@ -7,6 +7,29 @@ data class GeoPoint(
     val longitude: Double,
 )
 
+data class LocalOffsetMeters(
+    val eastMeters: Double,
+    val northMeters: Double,
+)
+
+sealed interface CheckInArea
+
+data class CircularCheckInArea(
+    val radiusMeters: Double,
+) : CheckInArea {
+    init {
+        require(radiusMeters > 0.0) { "Circle radius must be positive" }
+    }
+}
+
+data class PolygonCheckInArea(
+    val vertices: List<LocalOffsetMeters>,
+) : CheckInArea {
+    init {
+        require(vertices.size >= 3) { "Polygon check-in area requires at least three vertices" }
+    }
+}
+
 data class LocationSample(
     val point: GeoPoint,
     val accuracyMeters: Float,
@@ -32,7 +55,8 @@ data class Landmark(
     val fragmentId: String,
     val pieceIndex: Int,
     val coordinateVerified: Boolean,
-    val checkInRadiusMeters: Double,
+    val checkInArea: CheckInArea,
+    val revealRadiusMeters: Double = 220.0,
     val difficulty: Int,
     val terrain: Int,
     val hint: String?,
@@ -147,6 +171,10 @@ data class MapRenderState(
     val userLocation: LocationSample?,
     val landmarks: List<Landmark>,
     val selectedLandmarkId: String?,
+    val exploredCenters: List<GeoPoint> = emptyList(),
+    val completedLandmarkIds: Set<String> = emptySet(),
+    val debugRevealAll: Boolean = false,
+    val debugShowScoutRange: Boolean = false,
 )
 
 sealed interface MapEvent {

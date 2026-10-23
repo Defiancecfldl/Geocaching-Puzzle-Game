@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bitse.geotreasure.app.ExplorationProgressStore
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,11 +34,19 @@ data class CheckInResultUiState(val checkInId: String, val grantedPieceIndex: In
 sealed interface CheckInResultAction { data object OpenPuzzle : CheckInResultAction }
 sealed interface CheckInResultEffect { data class NavigateToPuzzle(val puzzleId: String) : CheckInResultEffect }
 
-class CheckInResultViewModel(checkInId: String) : ViewModel() {
+class CheckInResultViewModel(
+    checkInId: String,
+    landmarkId: String,
+    progressStore: ExplorationProgressStore,
+) : ViewModel() {
     private val mutableUiState = MutableStateFlow(CheckInResultUiState(checkInId))
     val uiState: StateFlow<CheckInResultUiState> = mutableUiState.asStateFlow()
     private val effectChannel = Channel<CheckInResultEffect>(Channel.BUFFERED)
     val effects = effectChannel.receiveAsFlow()
+
+    init {
+        progressStore.markLandmarkCompleted(landmarkId)
+    }
 
     fun onAction(action: CheckInResultAction) {
         if (action == CheckInResultAction.OpenPuzzle) {
@@ -46,9 +55,14 @@ class CheckInResultViewModel(checkInId: String) : ViewModel() {
     }
 
     companion object {
-        fun factory(checkInId: String): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+        fun factory(
+            checkInId: String,
+            landmarkId: String,
+            progressStore: ExplorationProgressStore,
+        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T = CheckInResultViewModel(checkInId) as T
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                CheckInResultViewModel(checkInId, landmarkId, progressStore) as T
         }
     }
 }

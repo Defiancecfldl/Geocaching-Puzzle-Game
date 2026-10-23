@@ -34,7 +34,9 @@ fun GeoTreasureNavHost() {
                     landmarkRepository = container.landmarkRepository,
                     locationProvider = container.locationProvider,
                     privacyManager = container.privacyManager,
+                    explorationProgressStore = container.explorationProgressStore,
                     hasAmapKey = BuildConfig.HAS_AMAP_KEY,
+                    debugEnabled = BuildConfig.DEBUG,
                 ),
             )
             MapScreen(
@@ -69,15 +71,27 @@ fun GeoTreasureNavHost() {
             CameraScreen(
                 viewModel = cameraViewModel,
                 onBack = navController::popBackStack,
-                onResult = { navController.navigate(AppRoutes.checkInResult(it)) },
+                onResult = { checkInId, completedLandmarkId ->
+                    navController.navigate(AppRoutes.checkInResult(checkInId, completedLandmarkId))
+                },
             )
         }
         composable(
             route = AppRoutes.CHECK_IN_RESULT,
-            arguments = listOf(navArgument("checkInId") { type = NavType.StringType }),
+            arguments = listOf(
+                navArgument("checkInId") { type = NavType.StringType },
+                navArgument("landmarkId") { type = NavType.StringType },
+            ),
         ) { entry ->
             val checkInId = requireNotNull(entry.arguments?.getString("checkInId"))
-            val resultViewModel: CheckInResultViewModel = viewModel(factory = CheckInResultViewModel.factory(checkInId))
+            val landmarkId = requireNotNull(entry.arguments?.getString("landmarkId"))
+            val resultViewModel: CheckInResultViewModel = viewModel(
+                factory = CheckInResultViewModel.factory(
+                    checkInId = checkInId,
+                    landmarkId = landmarkId,
+                    progressStore = container.explorationProgressStore,
+                ),
+            )
             CheckInResultScreen(
                 viewModel = resultViewModel,
                 onOpenPuzzle = { navController.navigate(AppRoutes.puzzle(it)) },
