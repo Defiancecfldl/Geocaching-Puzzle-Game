@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "npm run dev --workspace @geotreasure/cloudbase",
     "typecheck": "npm run typecheck --workspace @geotreasure/cloudbase",
+    "test": "npm run test --workspace @geotreasure/cloudbase",
+    "api:check": "npm run api:check --workspace @geotreasure/cloudbase",
     "cloudbase": "npm run cloudbase --workspace @geotreasure/cloudbase --",
     "bruno": "npm run bruno --workspace @geotreasure/cloudbase --",
     "api:contract": "npm run api:contract --workspace @geotreasure/cloudbase",
