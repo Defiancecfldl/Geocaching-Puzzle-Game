@@ -185,7 +185,10 @@ class MapViewModel(
                 .catch { throwable ->
                     locationWatchdogJob?.cancel()
                     mutableUiState.update {
-                        it.copy(message = throwable.message ?: "定位暂时不可用，请稍后重试。")
+                        it.copy(
+                            locationSignalActive = false,
+                            message = throwable.message ?: "定位暂时不可用，请稍后重试。",
+                        )
                     }
                 }
                 .collect { location ->
@@ -193,6 +196,7 @@ class MapViewModel(
                     mutableUiState.update {
                         it.copy(
                             userLocation = location,
+                            locationSignalActive = true,
                             message = null,
                             exploredCenters = updatedExploredCenters(it.exploredCenters, location),
                         ).withUpdatedDistance()
@@ -207,7 +211,9 @@ class MapViewModel(
         locationWatchdogJob?.cancel()
         locationWatchdogJob = null
         locationProvider.stopLocationUpdates()
-        mutableUiState.update { it.copy(userLocation = null, distanceToSelectedMeters = null) }
+        mutableUiState.update {
+            it.copy(userLocation = null, locationSignalActive = false, distanceToSelectedMeters = null)
+        }
     }
 
     private fun scheduleLocationWatchdog() {
@@ -216,6 +222,7 @@ class MapViewModel(
             delay(LOCATION_SIGNAL_TIMEOUT_MILLIS)
             mutableUiState.update { state ->
                 state.copy(
+                    locationSignalActive = false,
                     message = if (state.userLocation == null) {
                         "暂未获取到定位，请到开阔区域后重试。"
                     } else {

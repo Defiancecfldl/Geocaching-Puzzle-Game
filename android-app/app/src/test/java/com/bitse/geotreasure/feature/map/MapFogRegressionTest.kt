@@ -1,6 +1,7 @@
 package com.bitse.geotreasure.feature.map
 
 import com.bitse.geotreasure.core.model.GeoPoint
+import com.bitse.geotreasure.core.model.FogOfWarRules
 import com.bitse.geotreasure.core.model.LiangxiangTreasureCatalog
 import com.bitse.geotreasure.core.model.LocalOffsetMeters
 import com.bitse.geotreasure.core.model.LocationSample
@@ -30,8 +31,32 @@ class MapFogRegressionTest {
         val second = LiangxiangTreasureCatalog.landmarks.last().point
 
         assertNotEquals(projection.position(first), projection.position(second))
-        assertTrue(projection.radiusFractions(120.0).xFraction > 0f)
-        assertTrue(projection.radiusFractions(120.0).yFraction > 0f)
+        assertEquals(15.0, FogOfWarRules.SCOUT_RADIUS_METERS, 0.001)
+        assertTrue(projection.radiusFractions(FogOfWarRules.SCOUT_RADIUS_METERS).xFraction > 0f)
+        assertTrue(projection.radiusFractions(FogOfWarRules.SCOUT_RADIUS_METERS).yFraction > 0f)
+    }
+
+    @Test
+    fun `first reliable location opens fog and walking samples stay continuous`() {
+        val first = LiangxiangTreasureCatalog.landmarks.first().point
+        val nearby = com.bitse.geotreasure.core.location.offsetPoint(first, LocalOffsetMeters(8.0, 0.0))
+        val next = com.bitse.geotreasure.core.location.offsetPoint(first, LocalOffsetMeters(12.0, 0.0))
+
+        val initial = updatedExploredCenters(emptyList(), sample(first, 18f))
+        assertEquals(listOf(first), initial)
+        assertEquals(initial, updatedExploredCenters(initial, sample(nearby, 18f)))
+        assertEquals(listOf(first, next), updatedExploredCenters(initial, sample(next, 18f)))
+    }
+
+    @Test
+    fun `live scout is visible immediately but poor accuracy is not saved`() {
+        val location = sample(GeoPoint(39.7366, 116.1666), 57f)
+        val active = MapUiState(userLocation = location, locationSignalActive = true)
+        val stale = active.copy(locationSignalActive = false)
+
+        assertEquals(location.point, active.renderState.liveScoutCenter)
+        assertEquals(emptyList<GeoPoint>(), updatedExploredCenters(emptyList(), location))
+        assertEquals(null, stale.renderState.liveScoutCenter)
     }
 
     @Test

@@ -32,9 +32,11 @@ import androidx.compose.runtime.remember
 import com.bitse.geotreasure.core.model.CampusZone
 import com.bitse.geotreasure.core.model.CheckInArea
 import com.bitse.geotreasure.core.model.CircularCheckInArea
+import com.bitse.geotreasure.core.model.FogOfWarRules
 import com.bitse.geotreasure.core.model.Landmark
 import com.bitse.geotreasure.core.model.MapRenderState
 import com.bitse.geotreasure.core.model.PolygonCheckInArea
+import com.bitse.geotreasure.core.model.campusRevealBlocks
 
 @Composable
 fun DemoMapContent(
@@ -46,6 +48,7 @@ fun DemoMapContent(
     val projection = remember(state.landmarks) {
         state.landmarks.takeIf { it.isNotEmpty() }?.let(::DemoMapProjection)
     }
+    val revealBlocks = remember(state.landmarks) { campusRevealBlocks(state.landmarks) }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -123,7 +126,7 @@ fun DemoMapContent(
                 projection?.let { mapProjection ->
                     state.exploredCenters.forEach { explored ->
                         val position = mapProjection.position(explored)
-                        val radius = mapProjection.radiusFractions(SCOUT_RADIUS_METERS)
+                        val radius = mapProjection.radiusFractions(FogOfWarRules.SCOUT_RADIUS_METERS)
                         drawOval(
                             color = Color.Transparent,
                             topLeft = Offset(size.width * (position.xFraction - radius.xFraction), size.height * (position.yFraction - radius.yFraction)),
@@ -131,9 +134,19 @@ fun DemoMapContent(
                             blendMode = BlendMode.Clear,
                         )
                     }
-                    if (state.debugShowScoutRange && state.userLocation != null) {
-                        val position = mapProjection.position(state.userLocation.point)
-                        val radius = mapProjection.radiusFractions(SCOUT_RADIUS_METERS)
+                    state.liveScoutCenter?.let { center ->
+                        val position = mapProjection.position(center)
+                        val radius = mapProjection.radiusFractions(FogOfWarRules.SCOUT_RADIUS_METERS)
+                        drawOval(
+                            color = Color.Transparent,
+                            topLeft = Offset(size.width * (position.xFraction - radius.xFraction), size.height * (position.yFraction - radius.yFraction)),
+                            size = Size(size.width * radius.xFraction * 2, size.height * radius.yFraction * 2),
+                            blendMode = BlendMode.Clear,
+                        )
+                    }
+                    if (state.debugShowScoutRange && state.liveScoutCenter != null) {
+                        val position = mapProjection.position(state.liveScoutCenter)
+                        val radius = mapProjection.radiusFractions(FogOfWarRules.SCOUT_RADIUS_METERS)
                         drawOval(
                             color = Color(0xCC66D7B0),
                             topLeft = Offset(size.width * (position.xFraction - radius.xFraction), size.height * (position.yFraction - radius.yFraction)),
@@ -142,18 +155,17 @@ fun DemoMapContent(
                         )
                     }
                 }
-                state.landmarks.forEach { landmark ->
-                    if (landmark.id in state.completedLandmarkIds) {
-                        val mapProjection = projection ?: return@forEach
-                        val position = mapProjection.position(landmark.point)
-                        val radius = mapProjection.radiusFractions(landmark.revealRadiusMeters)
-                        drawOval(
-                            color = Color.Transparent,
-                            topLeft = Offset(size.width * (position.xFraction - radius.xFraction), size.height * (position.yFraction - radius.yFraction)),
-                            size = Size(size.width * radius.xFraction * 2, size.height * radius.yFraction * 2),
-                            blendMode = BlendMode.Clear,
-                        )
+                revealBlocks.filter { it.landmarkId in state.completedLandmarkIds }.forEach { block ->
+                    val mapProjection = projection ?: return@forEach
+                    val path = Path()
+                    block.vertices.forEachIndexed { index, vertex ->
+                        val position = mapProjection.position(vertex)
+                        val x = size.width * position.xFraction
+                        val y = size.height * position.yFraction
+                        if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
                     }
+                    path.close()
+                    drawPath(path, color = Color.Transparent, blendMode = BlendMode.Clear)
                 }
             }
         }
@@ -257,8 +269,6 @@ private fun MapMarkerButton(
         Icon(Icons.Rounded.LocationOn, contentDescription = "选择${landmark.name}")
     }
 }
-
-private const val SCOUT_RADIUS_METERS = 120.0
 
 @Composable
 private fun CampusZone.markerColor(): Color = when (this) {

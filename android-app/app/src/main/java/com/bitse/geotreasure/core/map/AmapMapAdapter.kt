@@ -13,15 +13,18 @@ import com.amap.api.maps.model.Marker
 import com.amap.api.maps.model.MarkerOptions
 import com.amap.api.maps.model.MyLocationStyle
 import com.amap.api.maps.model.Polygon
+import com.amap.api.maps.model.PolygonHoleOptions
 import com.amap.api.maps.model.PolygonOptions
 import com.bitse.geotreasure.core.location.offsetPoint
 import com.bitse.geotreasure.core.model.CircularCheckInArea
+import com.bitse.geotreasure.core.model.FogOfWarRules
 import com.bitse.geotreasure.core.model.GeoPoint
 import com.bitse.geotreasure.core.model.Landmark
 import com.bitse.geotreasure.core.model.LocationSample
 import com.bitse.geotreasure.core.model.MapEvent
 import com.bitse.geotreasure.core.model.MapRenderState
 import com.bitse.geotreasure.core.model.PolygonCheckInArea
+import com.bitse.geotreasure.core.model.campusRevealBlocks
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -35,9 +38,12 @@ internal class AmapMapAdapter(
     private val normalLandmarkIcon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)
     private val selectedLandmarkIcon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE)
     private var cameraInitialized = false
+    private var cameraFocusedOnUser = false
     private var renderedLocation: LocationSample? = null
     private var renderedExploredCenters: List<GeoPoint> = emptyList()
+    private var renderedLiveScoutCenter: GeoPoint? = null
     private var renderedCompletedLandmarkIds: Set<String> = emptySet()
+    private var renderedFogLandmarks: List<Landmark> = emptyList()
     private var renderedDebugRevealAll = false
     private var renderedDebugShowScoutRange = false
     private var fogOverlay: Polygon? = null
@@ -77,7 +83,9 @@ internal class AmapMapAdapter(
         if (
             state.userLocation != renderedLocation ||
             state.exploredCenters != renderedExploredCenters ||
+            state.liveScoutCenter != renderedLiveScoutCenter ||
             state.completedLandmarkIds != renderedCompletedLandmarkIds ||
+            state.landmarks != renderedFogLandmarks ||
             state.debugRevealAll != renderedDebugRevealAll ||
             state.debugShowScoutRange != renderedDebugShowScoutRange ||
             fogOverlay == null
@@ -86,11 +94,18 @@ internal class AmapMapAdapter(
             updateExplorationOverlay(state)
             renderedLocation = state.userLocation
             renderedExploredCenters = state.exploredCenters
+            renderedLiveScoutCenter = state.liveScoutCenter
             renderedCompletedLandmarkIds = state.completedLandmarkIds
+            renderedFogLandmarks = state.landmarks
             renderedDebugRevealAll = state.debugRevealAll
             renderedDebugShowScoutRange = state.debugShowScoutRange
         }
-        if (!cameraInitialized) {
+        if (!cameraFocusedOnUser && state.userLocation != null) {
+            val point = state.userLocation.point
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(point.latitude, point.longitude), DEFAULT_ZOOM))
+            cameraInitialized = true
+            cameraFocusedOnUser = true
+        } else if (!cameraInitialized) {
             val focus = state.userLocation?.point ?: state.landmarks.firstOrNull()?.point
             focus?.let {
                 map.moveCamera(
@@ -208,14 +223,19 @@ internal class AmapMapAdapter(
         val holes = state.exploredCenters.map<GeoPoint, BaseHoleOptions> { center ->
             CircleHoleOptions()
                 .center(LatLng(center.latitude, center.longitude))
-                .radius(SCOUT_RADIUS_METERS)
+                .radius(FogOfWarRules.SCOUT_RADIUS_METERS)
         }.toMutableList()
-        state.landmarks
-            .filter { it.id in state.completedLandmarkIds }
-            .forEach { landmark ->
+        state.liveScoutCenter?.let { center ->
+            if (center !in state.exploredCenters) {
                 holes += CircleHoleOptions()
-                    .center(LatLng(landmark.point.latitude, landmark.point.longitude))
-                    .radius(landmark.revealRadiusMeters)
+                    .center(LatLng(center.latitude, center.longitude))
+                    .radius(FogOfWarRules.SCOUT_RADIUS_METERS)
+            }
+        }
+        campusRevealBlocks(state.landmarks)
+            .filter { it.landmarkId in state.completedLandmarkIds }
+            .forEach { block ->
+                holes += PolygonHoleOptions().addAll(block.vertices.map { LatLng(it.latitude, it.longitude) })
             }
         if (fogOverlay == null) {
             fogOverlay = map.addPolygon(
@@ -232,17 +252,17 @@ internal class AmapMapAdapter(
         }
         fogOverlay?.isVisible = !state.debugRevealAll
 
-        val userLocation = state.userLocation
-        if (!state.debugShowScoutRange || userLocation == null) {
+        val liveScoutCenter = state.liveScoutCenter
+        if (!state.debugShowScoutRange || liveScoutCenter == null) {
             scoutCircle?.remove()
             scoutCircle = null
         } else {
-            val center = LatLng(userLocation.point.latitude, userLocation.point.longitude)
+            val center = LatLng(liveScoutCenter.latitude, liveScoutCenter.longitude)
             if (scoutCircle == null) {
                 scoutCircle = map.addCircle(
                     CircleOptions()
                         .center(center)
-                        .radius(SCOUT_RADIUS_METERS)
+                .radius(FogOfWarRules.SCOUT_RADIUS_METERS)
                         .strokeWidth(3f)
                         .strokeColor(SCOUT_STROKE_COLOR)
                         .fillColor(SCOUT_FILL_COLOR)
@@ -250,7 +270,7 @@ internal class AmapMapAdapter(
                 )
             } else {
                 scoutCircle?.center = center
-                scoutCircle?.radius = SCOUT_RADIUS_METERS
+                scoutCircle?.radius = FogOfWarRules.SCOUT_RADIUS_METERS
             }
         }
     }
@@ -266,6 +286,7 @@ internal class AmapMapAdapter(
     }
 
     override fun focusOn(point: GeoPoint) {
+        cameraFocusedOnUser = true
         map.stopAnimation()
         map.animateCamera(
             CameraUpdateFactory.newLatLngZoom(
@@ -321,7 +342,6 @@ internal class AmapMapAdapter(
         private const val DEFAULT_ZOOM = 17f
         private const val CAMERA_ANIMATION_MILLIS = 220L
         private const val LOCATION_INTERVAL_MILLIS = 3_000L
-        private const val SCOUT_RADIUS_METERS = 120.0
         private const val FOG_Z_INDEX = 30f
         private const val SCOUT_Z_INDEX = 31f
         private val FOG_FILL_COLOR = 0x66343A40
