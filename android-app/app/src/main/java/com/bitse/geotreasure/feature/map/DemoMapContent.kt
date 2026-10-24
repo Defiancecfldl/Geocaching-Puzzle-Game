@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.remember
 import com.bitse.geotreasure.core.model.CampusZone
 import com.bitse.geotreasure.core.model.CheckInArea
 import com.bitse.geotreasure.core.model.CircularCheckInArea
@@ -41,7 +43,10 @@ fun DemoMapContent(
     modifier: Modifier = Modifier,
 ) {
     val tertiary = MaterialTheme.colorScheme.tertiary
-    Box(
+    val projection = remember(state.landmarks) {
+        state.landmarks.takeIf { it.isNotEmpty() }?.let(::DemoMapProjection)
+    }
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFE9EEE7)),
@@ -94,8 +99,8 @@ fun DemoMapContent(
         }
 
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            state.landmarks.forEachIndexed { index, landmark ->
-                val position = demoMarkerPositions[index % demoMarkerPositions.size]
+            state.landmarks.forEach { landmark ->
+                val position = projection?.position(landmark.point) ?: return@forEach
                 DemoLandmarkMarker(
                     landmark = landmark,
                     selected = landmark.id == state.selectedLandmarkId,
@@ -115,44 +120,52 @@ fun DemoMapContent(
         ) {
             if (!state.debugRevealAll) {
                 drawRect(color = Color(0x66343A40))
-                if (state.userLocation != null) {
-                    drawCircle(
-                        color = Color.Transparent,
-                        radius = size.minDimension * 0.19f,
-                        center = center,
-                        blendMode = BlendMode.Clear,
-                    )
-                    if (state.debugShowScoutRange) {
-                        drawCircle(
+                projection?.let { mapProjection ->
+                    state.exploredCenters.forEach { explored ->
+                        val position = mapProjection.position(explored)
+                        val radius = mapProjection.radiusFractions(SCOUT_RADIUS_METERS)
+                        drawOval(
+                            color = Color.Transparent,
+                            topLeft = Offset(size.width * (position.xFraction - radius.xFraction), size.height * (position.yFraction - radius.yFraction)),
+                            size = Size(size.width * radius.xFraction * 2, size.height * radius.yFraction * 2),
+                            blendMode = BlendMode.Clear,
+                        )
+                    }
+                    if (state.debugShowScoutRange && state.userLocation != null) {
+                        val position = mapProjection.position(state.userLocation.point)
+                        val radius = mapProjection.radiusFractions(SCOUT_RADIUS_METERS)
+                        drawOval(
                             color = Color(0xCC66D7B0),
-                            radius = size.minDimension * 0.19f,
-                            center = center,
+                            topLeft = Offset(size.width * (position.xFraction - radius.xFraction), size.height * (position.yFraction - radius.yFraction)),
+                            size = Size(size.width * radius.xFraction * 2, size.height * radius.yFraction * 2),
                             style = Stroke(width = 3.dp.toPx()),
                         )
                     }
                 }
-                state.landmarks.forEachIndexed { index, landmark ->
+                state.landmarks.forEach { landmark ->
                     if (landmark.id in state.completedLandmarkIds) {
-                        val position = demoMarkerPositions[index % demoMarkerPositions.size]
-                        drawCircle(
+                        val mapProjection = projection ?: return@forEach
+                        val position = mapProjection.position(landmark.point)
+                        val radius = mapProjection.radiusFractions(landmark.revealRadiusMeters)
+                        drawOval(
                             color = Color.Transparent,
-                            radius = size.minDimension * 0.16f,
-                            center = Offset(
-                                x = size.width * position.xFraction,
-                                y = size.height * position.yFraction,
-                            ),
+                            topLeft = Offset(size.width * (position.xFraction - radius.xFraction), size.height * (position.yFraction - radius.yFraction)),
+                            size = Size(size.width * radius.xFraction * 2, size.height * radius.yFraction * 2),
                             blendMode = BlendMode.Clear,
                         )
                     }
                 }
             }
         }
-        if (state.userLocation != null) {
+        if (state.userLocation != null && projection != null) {
+            val position = projection.position(state.userLocation.point)
             Icon(
                 imageVector = Icons.Rounded.MyLocation,
                 contentDescription = "当前位置",
                 tint = tertiary,
-                modifier = Modifier.align(Alignment.Center).size(30.dp),
+                modifier = Modifier
+                    .offset(x = maxWidth * position.xFraction - 15.dp, y = maxHeight * position.yFraction - 15.dp)
+                    .size(30.dp),
             )
         }
     }
@@ -245,25 +258,7 @@ private fun MapMarkerButton(
     }
 }
 
-private data class DemoMarkerPosition(
-    val xFraction: Float,
-    val yFraction: Float,
-)
-
-private val demoMarkerPositions = listOf(
-    DemoMarkerPosition(0.12f, 0.14f),
-    DemoMarkerPosition(0.31f, 0.18f),
-    DemoMarkerPosition(0.14f, 0.30f),
-    DemoMarkerPosition(0.34f, 0.34f),
-    DemoMarkerPosition(0.61f, 0.14f),
-    DemoMarkerPosition(0.80f, 0.20f),
-    DemoMarkerPosition(0.63f, 0.31f),
-    DemoMarkerPosition(0.82f, 0.37f),
-    DemoMarkerPosition(0.13f, 0.48f),
-    DemoMarkerPosition(0.33f, 0.54f),
-    DemoMarkerPosition(0.58f, 0.49f),
-    DemoMarkerPosition(0.77f, 0.55f),
-)
+private const val SCOUT_RADIUS_METERS = 120.0
 
 @Composable
 private fun CampusZone.markerColor(): Color = when (this) {

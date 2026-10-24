@@ -102,7 +102,9 @@ fun GeoTreasureNavHost() {
             arguments = listOf(navArgument("puzzleId") { type = NavType.StringType }),
         ) { entry ->
             val puzzleId = requireNotNull(entry.arguments?.getString("puzzleId"))
-            val puzzleViewModel: PuzzleViewModel = viewModel(factory = PuzzleViewModel.factory(puzzleId))
+            val puzzleViewModel: PuzzleViewModel = viewModel(
+                factory = PuzzleViewModel.factory(puzzleId, container.explorationProgressStore),
+            )
             PuzzleScreen(viewModel = puzzleViewModel, onBack = navController::popBackStack)
         }
     }

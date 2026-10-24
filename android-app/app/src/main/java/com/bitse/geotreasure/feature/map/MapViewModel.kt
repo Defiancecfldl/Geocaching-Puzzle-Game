@@ -8,11 +8,9 @@ import com.bitse.geotreasure.core.common.AppResult
 import com.bitse.geotreasure.core.location.LocationPrivacyManager
 import com.bitse.geotreasure.core.location.LocationProvider
 import com.bitse.geotreasure.core.location.distanceMeters
-import com.bitse.geotreasure.core.model.GeoPoint
 import com.bitse.geotreasure.core.model.CheckInArea
 import com.bitse.geotreasure.core.model.CircularCheckInArea
 import com.bitse.geotreasure.core.model.LocalOffsetMeters
-import com.bitse.geotreasure.core.model.LocationSample
 import com.bitse.geotreasure.core.model.PolygonCheckInArea
 import com.bitse.geotreasure.data.repository.LandmarkRepository
 import kotlinx.coroutines.Job
@@ -25,6 +23,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 class MapViewModel(
     private val landmarkRepository: LandmarkRepository,
@@ -195,7 +194,7 @@ class MapViewModel(
                         it.copy(
                             userLocation = location,
                             message = null,
-                            exploredCenters = it.exploredCenters.updatedWith(location),
+                            exploredCenters = updatedExploredCenters(it.exploredCenters, location),
                         ).withUpdatedDistance()
                     }
                 }
@@ -233,15 +232,7 @@ class MapViewModel(
         return copy(distanceToSelectedMeters = distanceMeters(location.point, landmark.point))
     }
 
-    private fun List<GeoPoint>.updatedWith(location: LocationSample): List<GeoPoint> {
-        if (location.accuracyMeters > MAX_EXPLORATION_ACCURACY_METERS) return this
-        if (any { distanceMeters(it, location.point) < EXPLORATION_RECORD_DISTANCE_METERS }) return this
-        return this + location.point
-    }
-
     companion object {
-        private const val MAX_EXPLORATION_ACCURACY_METERS = 50f
-        private const val EXPLORATION_RECORD_DISTANCE_METERS = 60.0
         private const val LOCATION_SIGNAL_TIMEOUT_MILLIS = 12_000L
 
         fun factory(
@@ -270,14 +261,14 @@ class MapViewModel(
     }
 }
 
-private fun CheckInArea.debugRadiusMeters(): Double = when (this) {
+internal fun CheckInArea.debugRadiusMeters(): Double = when (this) {
     is CircularCheckInArea -> radiusMeters
     is PolygonCheckInArea -> vertices.maxOf { offset ->
-        kotlin.math.hypot(offset.eastMeters, offset.northMeters)
+        maxOf(abs(offset.eastMeters), abs(offset.northMeters))
     }
 }
 
-private fun CheckInArea.withDebugRadius(radiusMeters: Double): CheckInArea = when (this) {
+internal fun CheckInArea.withDebugRadius(radiusMeters: Double): CheckInArea = when (this) {
     is CircularCheckInArea -> CircularCheckInArea(radiusMeters)
     is PolygonCheckInArea -> rectangleArea(radiusMeters)
 }
